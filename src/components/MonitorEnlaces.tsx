@@ -361,6 +361,13 @@ const MonitorEnlaces = () => {
               >
                 🌐 Estático
               </Button>
+              <Button
+                variant={filterStatus === 'available' ? 'default' : 'outline'}
+                onClick={() => setFilterStatus('available')}
+                size="sm"
+              >
+                🆓 Disponibles
+              </Button>
             </div>
           </div>
 
