@@ -29,6 +29,7 @@ const ConfigGenerator = () => {
   const [showResults, setShowResults] = useState(false);
   const [suggestedIP, setSuggestedIP] = useState<number | null>(null);
   const [suggestedLAN, setSuggestedLAN] = useState<string>("");
+  const [suggestedMC, setSuggestedMC] = useState<number | null>(null);
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
 
   useEffect(() => {
@@ -48,15 +49,25 @@ const ConfigGenerator = () => {
       if (error) throw error;
       
       if (data.success) {
+        const usedMCs = new Set<number>();
         const usedWGIPs = new Set<number>();
         const usedLANs = new Set<string>();
         
         data.data.forEach((peer: any) => {
+          // Extraer MC del nombre
+          const name = peer.name || peer.comment || "";
+          const mcMatch = name.match(/^(?:WIREGUARD-)?MC(\d+)(?:[_-]|$)/i);
+          if (mcMatch) {
+            usedMCs.add(parseInt(mcMatch[1]));
+          }
+          
+          // Extraer IP WireGuard
           const wgIPMatch = peer["allowed-address"].match(/100\.100\.100\.(\d+)/);
           if (wgIPMatch) {
             usedWGIPs.add(parseInt(wgIPMatch[1]));
           }
           
+          // Extraer LANs
           const lans = peer["allowed-address"]
             .split(',')
             .filter((addr: string) => !addr.includes('100.100.100') && !addr.includes('172.16.100'))
@@ -64,6 +75,17 @@ const ConfigGenerator = () => {
           
           lans.forEach((lan: string) => usedLANs.add(lan));
         });
+
+        // MCs estáticos y DDNS reservados
+        const DDNS_RESERVED_MCS = [2, 7, 14, 20, 26, 46, 62, 66, 70];
+        const STATIC_OVERRIDES = [5, 8, 19, 21, 22, 31, 38, 63];
+        
+        DDNS_RESERVED_MCS.forEach(mc => usedMCs.add(mc));
+        STATIC_OVERRIDES.forEach(mc => usedMCs.add(mc));
+
+        // Encontrar siguiente MC disponible (1-200)
+        const nextMC = Array.from({ length: 200 }, (_, idx) => idx + 1)
+          .find(mc => !usedMCs.has(mc)) || 1;
 
         // Encontrar siguiente IP WireGuard disponible
         const nextWGIP = Array.from({ length: 252 }, (_, idx) => idx + 2)
@@ -73,6 +95,7 @@ const ConfigGenerator = () => {
         const nextLAN = Array.from({ length: 200 }, (_, idx) => `192.168.${idx + 10}`)
           .find(lan => !usedLANs.has(`${lan}.0/24`)) || "192.168.10";
 
+        setSuggestedMC(nextMC);
         setSuggestedIP(nextWGIP);
         setSuggestedLAN(nextLAN);
       }
@@ -224,12 +247,12 @@ const ConfigGenerator = () => {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleGenerate} className="space-y-6">
-          {suggestedIP && suggestedLAN && !loadingSuggestion && (
+          {suggestedMC && suggestedIP && suggestedLAN && !loadingSuggestion && (
             <Alert className="bg-primary/5 border-primary/20">
               <Lightbulb className="h-4 w-4" />
               <AlertDescription className="flex items-center justify-between">
                 <span>
-                  Siguiente disponible: <strong>IP 100.100.100.{suggestedIP}</strong> y <strong>LAN {suggestedLAN}.0/24</strong>
+                  Siguiente disponible: <strong>MC{String(suggestedMC).padStart(2, '0')}</strong>, <strong>IP 100.100.100.{suggestedIP}</strong> y <strong>LAN {suggestedLAN}.0/24</strong>
                 </span>
                 <Button type="button" size="sm" onClick={applySuggestion}>
                   Usar Sugerencia
