@@ -107,6 +107,9 @@ const ConfigGenerator = () => {
   };
 
   const applySuggestion = () => {
+    if (suggestedMC) {
+      setClientID(`MC${String(suggestedMC).padStart(2, '0')}`);
+    }
     if (suggestedIP) {
       setClientIPSuffix(suggestedIP.toString());
     }
